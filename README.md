@@ -12,14 +12,18 @@ Land wählen, großen Knopf drücken, fertig. Kein Konto nötig.
 
 ## Installation
 1. Die neueste `Fox-VPN.apk` unter **Releases** herunterladen und installieren.
-2. Beim ersten Start fragt Fox VPN nach dem Verbindungs-Motor
-   **„OpenVPN for Android“** (kostenlos, Open Source, Play Store oder F-Droid). Einmal installieren.
-3. In Fox VPN auf Verbinden tippen und die zwei Abfragen bestätigen
-   (Fox VPN erlauben, VPN-Verbindung erlauben). Das ist nur beim ersten Mal nötig.
+2. Auf Verbinden tippen und die VPN-Abfrage einmal bestätigen.
+
+Der VPN-Motor ist eingebaut, eine Zusatz-App ist nicht mehr nötig.
 
 ## Hinweis
 Die VPN-Gate-Server betreiben Freiwillige. Das reicht gut für Länderwechsel und Streaming.
 Für Banking und Passwörter solltest du sie nicht nutzen.
 
 ## Bauen
-Bei jedem Push auf `main` baut GitHub Actions die APK und hängt sie an ein neues Release.
+Bei jedem Push auf `main` holt GitHub Actions den VPN-Motor
+[ics-openvpn](https://github.com/schwabe/ics-openvpn) (GPLv2) in einer festen Version.
+Danach baut `fox/patch.py` die Fox-Oberfläche ein, die APK wird gebaut und an ein neues Release gehängt.
+
+## Lizenz
+Fox VPN enthält ics-openvpn und OpenVPN und steht deshalb unter der **GPLv2**.

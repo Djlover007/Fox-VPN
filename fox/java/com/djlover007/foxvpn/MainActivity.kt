@@ -1,8 +1,8 @@
 package com.djlover007.foxvpn
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.Uri
+import android.Manifest
+import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
 import androidx.activity.ComponentActivity
@@ -122,7 +122,6 @@ fun FoxTheme(content: @Composable () -> Unit) {
 
 class MainActivity : ComponentActivity() {
 
-    private lateinit var bridge: OpenVpnBridge
     private lateinit var browser: FoxBrowser
 
     private var servers by mutableStateOf<List<VpnServer>>(emptyList())
@@ -132,7 +131,6 @@ class MainActivity : ComponentActivity() {
     private var currentServer by mutableStateOf<VpnServer?>(null)
     private var info by mutableStateOf<String?>(null)
     private var ipInfo by mutableStateOf("…")
-    private var helperInstalled by mutableStateOf(false)
     private var pendingServer: VpnServer? = null
 
     private val permissionLauncher =
@@ -146,22 +144,21 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+    private val notificationLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        bridge = OpenVpnBridge(applicationContext)
+        FoxEngine.register()
         browser = FoxBrowser(this)
+        if (Build.VERSION.SDK_INT >= 33) {
+            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
         setContent { FoxTheme { FoxApp() } }
         loadServers()
     }
 
-    override fun onResume() {
-        super.onResume()
-        helperInstalled = bridge.isInstalled()
-        if (helperInstalled) bridge.bind()
-    }
-
     override fun onDestroy() {
-        bridge.unbind()
         browser.destroy()
         super.onDestroy()
     }
@@ -194,55 +191,28 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun connectTo(server: VpnServer) {
-        val s = bridge.service
-        if (s == null) {
-            info = if (helperInstalled) "VPN-Motor startet noch – bitte gleich nochmal tippen." else "Bitte zuerst den VPN-Motor installieren."
-            if (helperInstalled) bridge.bind()
+        val vpnPermission = VpnService.prepare(this)
+        if (vpnPermission != null) {
+            pendingServer = server
+            permissionLauncher.launch(vpnPermission)
             return
         }
+        currentServer = server
+        info = null
         lifecycleScope.launch {
             try {
-                val appPermission = withContext(Dispatchers.IO) { s.prepare(packageName) }
-                if (appPermission != null) {
-                    pendingServer = server
-                    permissionLauncher.launch(appPermission)
-                    return@launch
-                }
-                val vpnPermission = withContext(Dispatchers.IO) { s.prepareVPNService() }
-                if (vpnPermission != null) {
-                    pendingServer = server
-                    permissionLauncher.launch(vpnPermission)
-                    return@launch
-                }
-                bridge.registerCallback()
-                currentServer = server
-                info = null
-                bridge.state.value = "WAIT"
-                withContext(Dispatchers.IO) { s.startVPN(VpnGate.config(server)) }
+                withContext(Dispatchers.IO) { FoxEngine.start(applicationContext, server) }
             } catch (e: Exception) {
-                bridge.state.value = "NOPROCESS"
                 info = "Fehler beim Verbinden: ${e.message ?: e.javaClass.simpleName}"
             }
         }
     }
 
     private fun disconnect() {
-        val s = bridge.service ?: return
-        lifecycleScope.launch {
-            try {
-                withContext(Dispatchers.IO) { s.disconnect() }
-            } catch (e: Exception) {
-                info = "Trennen fehlgeschlagen: ${e.message}"
-            }
-        }
-    }
-
-    private fun openHelperInStore() {
-        val market = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${OpenVpnBridge.PKG}"))
         try {
-            startActivity(market)
-        } catch (e: ActivityNotFoundException) {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=${OpenVpnBridge.PKG}")))
+            FoxEngine.stop(this)
+        } catch (e: Exception) {
+            info = "Trennen fehlgeschlagen: ${e.message}"
         }
     }
 
@@ -288,8 +258,8 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun VpnScreen(onPickCountry: () -> Unit) {
-        val state = bridge.state.value
-        val conn = bridge.conn()
+        val state = FoxEngine.state.value
+        val conn = FoxEngine.conn()
 
         LaunchedEffect(conn) {
             if (conn != Conn.CONNECTING) {
@@ -306,11 +276,6 @@ class MainActivity : ComponentActivity() {
             Text("🦊 Fox VPN", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Fox.orange)
             Text("Land wählen, tippen, fertig.", color = Fox.muted, fontSize = 14.sp)
             Spacer(Modifier.height(16.dp))
-
-            if (!helperInstalled) {
-                HelperCard()
-                Spacer(Modifier.height(16.dp))
-            }
 
             // Großer Knopf
             val ringColor = when (conn) {
@@ -437,32 +402,9 @@ class MainActivity : ComponentActivity() {
             Spacer(Modifier.height(16.dp))
             Text(
                 "Server: VPN Gate (Uni Tsukuba, von Freiwilligen betrieben). Gut für Länderwechsel und Streaming – " +
-                    "für Banking und Passwörter lieber ohne.",
+                    "für Banking und Passwörter lieber ohne. VPN-Motor: OpenVPN (ics-openvpn, GPLv2).",
                 color = Fox.muted, fontSize = 11.sp, textAlign = TextAlign.Center,
             )
-        }
-    }
-
-    @Composable
-    private fun HelperCard() {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = Fox.orangeDark),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Text("Einmalig nötig", color = Fox.orange, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Fox VPN nutzt die kostenlose Open-Source-App „OpenVPN for Android“ als Verbindungs-Motor. " +
-                        "Einmal installieren – danach steuerst du alles hier in Fox VPN.",
-                    fontSize = 14.sp,
-                )
-                Spacer(Modifier.height(10.dp))
-                Button(
-                    onClick = { openHelperInStore() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Fox.orange, contentColor = Color.Black),
-                ) { Text("Im Play Store öffnen") }
-            }
         }
     }
 
@@ -578,7 +520,7 @@ class MainActivity : ComponentActivity() {
                     Icon(Icons.Filled.DeleteSweep, "Spuren löschen", tint = Fox.orange)
                 }
                 Spacer(Modifier.weight(1f))
-                val vpnOn = bridge.conn() == Conn.ON
+                val vpnOn = FoxEngine.conn() == Conn.ON
                 Icon(
                     if (vpnOn) Icons.Filled.Shield else Icons.Filled.Bolt, null,
                     tint = if (vpnOn) Fox.green else Fox.muted, modifier = Modifier.size(18.dp),

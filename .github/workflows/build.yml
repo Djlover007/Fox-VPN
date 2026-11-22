@@ -8,24 +8,66 @@ on:
 permissions:
   contents: write
 
+env:
+  # Feste, getestete Version des VPN-Motors (ics-openvpn, GPLv2)
+  ICS_REPO: https://github.com/schwabe/ics-openvpn.git
+  ICS_COMMIT: 660901ce320539aec476bd04bd1999c396d5e778
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+
+      - name: VPN-Motor holen
+        run: |
+          git init ics
+          cd ics
+          git remote add origin "$ICS_REPO"
+          git fetch --depth 1 origin "$ICS_COMMIT"
+          git checkout FETCH_HEAD
+          git submodule update --init
+
+      - name: Fox VPN einbauen
+        run: python3 fox/patch.py ics "${{ github.run_number }}"
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 25
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Werkzeuge
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq swig
+
+      - name: Gradle-Einstellungen
+        run: |
+          mkdir -p ~/.gradle
+          K="$GITHUB_WORKSPACE/fox/fox-vpn.keystore"
+          cat > ~/.gradle/gradle.properties <<EOF
+          org.gradle.jvmargs=-Xmx4g
+          keystoreO2File=$K
+          keystoreO2Password=foxvpn123
+          keystoreO2Alias=foxvpn
+          keystoreO2AliasPassword=foxvpn123
+          keystoreFile=$K
+          keystorePassword=foxvpn123
+          keystoreAlias=foxvpn
+          keystoreAliasPassword=foxvpn123
+          EOF
 
       - name: APK bauen
+        working-directory: ics
+        run: ./gradlew assembleSkeletonOvpn2Release --no-daemon --stacktrace
+
+      - name: APK einsammeln
         run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
-          cp app/build/outputs/apk/release/app-release.apk Fox-VPN.apk
+          APK=$(find ics/main/build/outputs/apk -name "*.apk" | head -1)
+          echo "Gefunden: $APK"
+          cp "$APK" Fox-VPN.apk
 
       - uses: actions/upload-artifact@v4
         with:
@@ -35,7 +77,8 @@ jobs:
       - name: Release erstellen
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: Fox VPN 1.0.${{ github.run_number }}
+          tag_name: v2.0.${{ github.run_number }}
+          name: Fox VPN 2.0.${{ github.run_number }}
+          body: Mit eingebautem VPN-Motor – keine Zusatz-App mehr nötig.
           files: Fox-VPN.apk
           make_latest: true
