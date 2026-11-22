@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Kopf mit Ohren -->
+    <path
+        android:fillColor="#FF7A1A"
+        android:pathData="M54,82 L30,56 L30,30 L44,42 L64,42 L78,30 L78,56 Z" />
+    <!-- Innenohren -->
+    <path
+        android:fillColor="#B84A0A"
+        android:pathData="M33,36 L41,44 L33,48 Z M75,36 L67,44 L75,48 Z" />
+    <!-- Wangen -->
+    <path
+        android:fillColor="#FFF4E8"
+        android:pathData="M30,56 L54,82 L54,66 L42,58 Z M78,56 L54,82 L54,66 L66,58 Z" />
+    <!-- Augen -->
+    <path
+        android:fillColor="#1A1A1A"
+        android:pathData="M41,53 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 Z M61,53 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 Z" />
+    <!-- Nase -->
+    <path
+        android:fillColor="#1A1A1A"
+        android:pathData="M50,76 L58,76 L54,81 Z" />
+</vector>

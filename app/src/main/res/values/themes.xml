@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="fox_bg">#FF101014</color>
+    <color name="fox_icon_bg">#FF1C1C22</color>
+
+    <style name="Theme.FoxVPN" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/fox_bg</item>
+        <item name="android:statusBarColor">@color/fox_bg</item>
+        <item name="android:navigationBarColor">@color/fox_bg</item>
+    </style>
+</resources>
