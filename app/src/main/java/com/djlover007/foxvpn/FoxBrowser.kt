@@ -38,7 +38,7 @@ class FoxBrowser(context: Context) {
             override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
                 val host = request?.url?.host ?: return null
                 if (AdBlock.isBlocked(host)) {
-                    view?.post { blocked += 1 }
+                    view?.post { this@FoxBrowser.blocked += 1 }
                     return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
                 }
                 return null
@@ -51,18 +51,18 @@ class FoxBrowser(context: Context) {
             }
 
             override fun onPageStarted(view: WebView?, u: String?, favicon: Bitmap?) {
-                url = u.orEmpty()
+                this@FoxBrowser.url = u.orEmpty()
                 updateNav(view)
             }
 
             override fun doUpdateVisitedHistory(view: WebView?, u: String?, isReload: Boolean) {
-                if (!u.isNullOrBlank()) url = u
+                if (!u.isNullOrBlank()) this@FoxBrowser.url = u
                 updateNav(view)
             }
         }
         webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                progress = newProgress
+                this@FoxBrowser.progress = newProgress
             }
         }
     }
