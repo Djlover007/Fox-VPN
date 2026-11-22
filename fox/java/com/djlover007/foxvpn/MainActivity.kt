@@ -44,7 +44,9 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -123,6 +125,7 @@ fun FoxTheme(content: @Composable () -> Unit) {
 class MainActivity : ComponentActivity() {
 
     private lateinit var browser: FoxBrowser
+    private lateinit var updater: FoxUpdater
 
     private var servers by mutableStateOf<List<VpnServer>>(emptyList())
     private var loading by mutableStateOf(false)
@@ -151,6 +154,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         FoxEngine.register()
         browser = FoxBrowser(this)
+        updater = FoxUpdater(applicationContext)
+        if (updater.autoCheckDue()) {
+            lifecycleScope.launch {
+                delay(3000)
+                updater.check(manual = false)
+            }
+        }
         if (Build.VERSION.SDK_INT >= 33) {
             notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -246,6 +256,7 @@ class MainActivity : ComponentActivity() {
                 }
             },
         ) { pad ->
+            if (updater.showDialog) UpdateDialog()
             Box(Modifier.padding(pad).fillMaxSize()) {
                 when {
                     tab == 0 && showCountries -> CountryScreen(onClose = { showCountries = false })
@@ -405,7 +416,68 @@ class MainActivity : ComponentActivity() {
                     "für Banking und Passwörter lieber ohne. VPN-Motor: OpenVPN (ics-openvpn, GPLv2).",
                 color = Fox.muted, fontSize = 11.sp, textAlign = TextAlign.Center,
             )
+            Spacer(Modifier.height(12.dp))
+            updater.message?.let {
+                Text(it, color = Fox.orange, fontSize = 13.sp, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(6.dp))
+            }
+            TextButton(onClick = { lifecycleScope.launch { updater.check(manual = true) } }) {
+                Text("Nach Updates suchen · Version ${updater.installedName}", color = Fox.muted, fontSize = 12.sp)
+            }
         }
+    }
+
+    @Composable
+    private fun UpdateDialog() {
+        val info = updater.available ?: return
+        AlertDialog(
+            onDismissRequest = { if (!updater.downloading) updater.showDialog = false },
+            containerColor = Fox.surface,
+            title = { Text("Neues Update bereit", color = Fox.orange, fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("Version 2.0.${info.version}", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Installiert: ${updater.installedName}" +
+                            (if (info.size > 0) " · ${"%.1f".format(info.size / 1_048_576.0)} MB" else ""),
+                        color = Fox.muted, fontSize = 12.sp,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text("Was ist neu", fontWeight = FontWeight.SemiBold)
+                    if (info.notes.isEmpty()) {
+                        Text("Kleine Verbesserungen und Fehlerbehebungen", color = Fox.muted, fontSize = 13.sp)
+                    } else {
+                        info.notes.forEach { Text("• $it", fontSize = 13.sp) }
+                    }
+                    if (updater.downloading) {
+                        Spacer(Modifier.height(12.dp))
+                        Text("Lade … ${updater.percent} %", color = Fox.orange)
+                        LinearProgressIndicator(
+                            progress = { updater.percent / 100f },
+                            color = Fox.orange,
+                            trackColor = Fox.surface2,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    updater.message?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, color = Fox.red, fontSize = 13.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { lifecycleScope.launch { updater.downloadAndInstall() } },
+                    enabled = !updater.downloading,
+                    colors = ButtonDefaults.buttonColors(containerColor = Fox.orange, contentColor = Color.Black),
+                ) { Text("Jetzt aktualisieren") }
+            },
+            dismissButton = {
+                TextButton(onClick = { updater.showDialog = false }, enabled = !updater.downloading) {
+                    Text("Später", color = Fox.muted)
+                }
+            },
+        )
     }
 
     @Composable

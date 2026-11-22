@@ -79,6 +79,6 @@ jobs:
         with:
           tag_name: v2.0.${{ github.run_number }}
           name: Fox VPN 2.0.${{ github.run_number }}
-          body: Mit eingebautem VPN-Motor – keine Zusatz-App mehr nötig.
+          body: ${{ github.event.head_commit.message }}
           files: Fox-VPN.apk
           make_latest: true
